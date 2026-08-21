@@ -61,26 +61,31 @@ const worker = {
         const [from, to] = await Promise.all([stationCode(fromInput), stationCode(toInput)]);
         const between = await rr(`/trains/between/${encodeURIComponent(from)}/${encodeURIComponent(to)}?date=${date}&byCity=true&live=true&_=${Date.now()}`);
         const rawTrains: any[] = Array.isArray(between?.trains) ? between.trains : [];
-        const prs: Record<string, any> = await rr("/lookup/trains/prs").catch(() => ({}));
-        const trains = await Promise.all(rawTrains.slice(0, 8).map(async (item: any) => {
+        // Free API allows 10 requests/minute: 1 route request + 2 live detail
+        // requests for each of the first 4 trains keeps one search within quota.
+        const trains = await Promise.all(rawTrains.slice(0, 4).map(async (item: any) => {
           const train = item.train || item;
           const number = String(train.number || train.trainNumber || "");
-          const classes: string[] = prs[number]?.classes || train.classes || [];
-          const classCode = ["3A", "SL", "CC", "2A", "EC", "1A", "2S"].find(c => classes.includes(c)) || classes[0] || "SL";
+          const trainInfo: any = {};
+          const rawClasses = train.classes || [];
+          const classes: string[] = (Array.isArray(rawClasses) ? rawClasses : String(rawClasses).split(",")).map((c: string) => c.trim().toUpperCase());
+          const chairCar = /vande bharat|shatabdi|jan shatabdi/i.test(`${train.name} ${train.type}`);
+          const classCode = ["3A", "CC", "SL", "2A", "EC", "1A", "2S"].find(c => classes.includes(c)) || (chairCar ? "CC" : "3A");
           const query = `journeyDate=${date}&source=${from}&destination=${to}&classCode=${classCode}&quotaCode=GN&_=${Date.now()}`;
           const [seatData, fareData] = await Promise.all([
             rr(`/trains/${number}/seats?${query}`).catch(() => null),
             rr(`/trains/${number}/fare?${query}`).catch(() => null),
           ]);
-          const availability = seatData?.avlDayList?.[0]?.availablityStatus || seatData?.avlDayList?.[0]?.availabilityStatus || seatData?.availability || "Status unavailable";
+          const day = seatData?.calendar?.find((d: any) => d.date === date) || seatData?.calendar?.[0] || seatData?.avlDayList?.[0];
+          const availability = day?.status || day?.availablityStatus || day?.availabilityStatus || seatData?.availability || "Status unavailable";
           return {
-            number, name: train.name || prs[number]?.name || `Train ${number}`, type: train.type || prs[number]?.type || "Train",
+            number, name: train.name || trainInfo.name || `Train ${number}`, type: train.type || trainInfo.type || "Train",
             departure: item.from?.departure || item.departure || "—", arrival: item.to?.arrival || item.arrival || "—",
             fromName: between?.from?.name || fromInput, toName: between?.to?.name || toInput,
-            duration: item.duration || "—", distance: item.distance ?? null, classCode, availability,
-            fare: fareData?.totalFare ?? fareData?.fare ?? null,
+            duration: typeof item.duration === "number" ? `${Math.floor(item.duration / 60)}h ${item.duration % 60}m` : (item.duration || "—"), distance: item.distance ?? null, classCode, availability,
+            fare: fareData?.totalFare ?? fareData?.breakdown?.totalFare ?? fareData?.fare ?? null,
             delayMinutes: item.live?.delayMinutes ?? null, platform: item.live?.platform ?? null,
-            runDays: train.runDays || prs[number]?.runsOn || [],
+            runDays: train.runDays || trainInfo.runsOn || [],
           };
         }));
         return new Response(JSON.stringify({ from: { code: from, name: between?.from?.name || fromInput }, to: { code: to, name: between?.to?.name || toInput }, date, count: trains.length, trains, fetchedAt: new Date().toISOString() }), { headers });

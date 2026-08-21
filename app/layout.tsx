@@ -1,1 +1,11 @@
-import type {Metadata} from "next";import "./globals.css";export const metadata:Metadata={title:"RailVista — Train tickets, beautifully simple",description:"Search trains, book seats and receive a scannable QR e-ticket."};export default function RootLayout({children}:{children:React.ReactNode}){return <html lang="en"><body>{children}</body></html>}
+import type {Metadata} from "next";
+import "./globals.css";
+
+export const metadata:Metadata={
+ title:"RailVista — Live train search, beautifully planned",
+ description:"Search date-specific Indian trains with live seat availability, fares, timings and running information.",
+};
+
+export default function RootLayout({children}:{children:React.ReactNode}){
+ return <html lang="en"><body>{children}</body></html>;
+}

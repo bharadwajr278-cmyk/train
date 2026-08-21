@@ -1,4 +1,13 @@
-# vinext-starter
+# RailVista — Live Train Search
+
+Live website: **https://railvista-live-trains.bhardwaj0129.chatgpt.site**
+
+Search with station codes such as `NDLS` and `LKO`. Results are fetched
+fresh for the selected date. The data provider's free plan is limited to 10
+requests per minute, so very rapid repeat searches can temporarily show
+unavailable seat/fare details.
+
+## Development
 
 A clean full-stack starter running on
 [vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
